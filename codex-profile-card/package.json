@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Generate SVG Codex usage profile cards from local Codex logs or ChatGPT Analytics API data.",
-  "repository": "github:ambar/codex-profile-card",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ambar/ambar.git",
+    "directory": "codex-profile-card"
+  },
   "bin": {
     "codex-profile-card": "./bin/codex-profile-card.mjs"
   },

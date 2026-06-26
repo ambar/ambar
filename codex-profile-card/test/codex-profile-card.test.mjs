@@ -26,7 +26,11 @@ test("package metadata exposes TypeScript declarations for the public API", asyn
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
   assert.equal(packageJson.types, "./src/codex-profile-card.d.ts");
-  assert.equal(packageJson.repository, "github:ambar/codex-profile-card");
+  assert.deepEqual(packageJson.repository, {
+    type: "git",
+    url: "git+https://github.com/ambar/ambar.git",
+    directory: "codex-profile-card",
+  });
   assert.deepEqual(packageJson.exports["."], {
     types: "./src/codex-profile-card.d.ts",
     import: "./src/codex-profile-card.mjs",
