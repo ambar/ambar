@@ -1,0 +1,31 @@
+{
+  "name": "codex-profile-card",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Generate SVG Codex usage profile cards from local Codex logs or ChatGPT Analytics API data.",
+  "repository": "github:ambar/codex-profile-card",
+  "bin": {
+    "codex-profile-card": "./bin/codex-profile-card.mjs"
+  },
+  "types": "./src/codex-profile-card.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/codex-profile-card.d.ts",
+      "import": "./src/codex-profile-card.mjs"
+    }
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bin/codex-profile-card.mjs",
+    "generate:example": "npx . --output assets/codex-profile-card.svg",
+    "generate:mock": "node scripts/generate-mock-cards.mjs",
+    "check": "node --check src/codex-profile-card.mjs && node --check bin/codex-profile-card.mjs && node --check scripts/generate-mock-cards.mjs && node --check scripts/mock-card-data.mjs",
+    "test": "node --test"
+  }
+}
