@@ -1,6 +1,6 @@
 # Codex Profile Card
 
-Generate an SVG Codex usage profile card from local Codex logs or ChatGPT Analytics API buckets.
+Generate an SVG Codex usage profile card from Codex app account statistics, local Codex logs, or ChatGPT Analytics API buckets.
 
 ![Codex profile card example](https://raw.githubusercontent.com/ambar/ambar/main/codex-profile-card/assets/codex-profile-card.svg)
 
@@ -18,7 +18,13 @@ Or with Bun:
 bunx codex-profile-card
 ```
 
-Both commands default to local Codex logs and write `codex-local.svg`.
+Both commands default to available local Codex logs and write `codex-local.svg`. Local logs may be incomplete, so their totals and streaks are estimates rather than account-wide profile statistics.
+
+To match the profile shown in the Codex app, use the signed-in Codex CLI and its [App Server account usage method](https://learn.chatgpt.com/docs/app-server):
+
+```bash
+npx -y codex-profile-card --source app --output codex-app.svg
+```
 
 Use `npx -y` in copy-paste commands so npm does not stop to ask before fetching a package. `bunx` does not need `-y`.
 
@@ -29,10 +35,11 @@ npx -y codex-profile-card --help
 
 Usage:
   codex-profile-card --source local --output codex-local.svg [options]
+  codex-profile-card --source app --output codex-app.svg [options]
   codex-profile-card --source analytics --output codex-analytics.svg [options]
 
 Options:
-  --source local|analytics        Data source. Defaults to local.
+  --source local|app|analytics    Data source. Defaults to local.
   --output <path>                 SVG output path. Defaults to codex-<source>.svg.
   --name <name>                   Display name. Defaults to Codex auth name, then "Codex User".
   --handle <handle>               Display handle. Defaults to empty.
@@ -52,6 +59,8 @@ Options:
 ```
 
 Live analytics mode needs `--api-key` and `--workspace-id`.
+
+Use `--source app` for the same account-wide lifetime tokens, peak day, streaks, and daily token activity as the Codex app. The repository's `npm run codex:app` updates the README profile; `npm run codex:local` writes a separate ignored local-log card for offline inspection.
 
 ## JavaScript API
 

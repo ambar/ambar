@@ -34,6 +34,28 @@ export interface BuildLocalCardDataOptions {
   days?: number;
 }
 
+export interface CodexAppUsage {
+  summary?: {
+    lifetimeTokens: number | null;
+    peakDailyTokens: number | null;
+    currentStreakDays: number | null;
+    longestStreakDays: number | null;
+  } | null;
+  dailyUsageBuckets?: Array<{ startDate: string; tokens: number }> | null;
+}
+
+export interface FetchCodexAppUsageOptions {
+  command?: string;
+  args?: string[];
+  timeoutMs?: number;
+}
+
+export interface BuildCodexAppCardDataOptions {
+  usage: CodexAppUsage;
+  now?: string;
+  days?: number;
+}
+
 export interface BuildAnalyticsCardDataOptions {
   buckets?: AnalyticsBucket[];
   now?: string;
@@ -79,6 +101,14 @@ export function summarizeUsageDays(
 export function buildLocalCardData(
   options?: BuildLocalCardDataOptions,
 ): Promise<CodexCardData>;
+
+export function fetchCodexAppUsage(
+  options?: FetchCodexAppUsageOptions,
+): Promise<CodexAppUsage>;
+
+export function buildCodexAppCardData(
+  options: BuildCodexAppCardDataOptions,
+): CodexCardData;
 
 export function buildAnalyticsCardData(
   options?: BuildAnalyticsCardDataOptions,

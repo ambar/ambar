@@ -2,7 +2,7 @@
   "name": "codex-profile-card",
   "version": "0.1.1",
   "type": "module",
-  "description": "Generate SVG Codex usage profile cards from local Codex logs or ChatGPT Analytics API data.",
+  "description": "Generate SVG Codex profile cards from Codex app account stats, local logs, or ChatGPT Analytics API data.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ambar/ambar.git",

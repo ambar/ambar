@@ -7,7 +7,8 @@
   ],
   "scripts": {
     "codex-profile-card": "npm --workspace codex-profile-card run start --",
-    "codex:local": "node codex-profile-card/bin/codex-profile-card.mjs --source local --output profile/codex-local.svg --name \"Ambar Li\" --handle \"@ambarli\" --initials AL",
+    "codex:local": "node codex-profile-card/bin/codex-profile-card.mjs --source local --output profile/codex-logs.svg --name \"Ambar Li\" --handle \"@ambarli\" --initials AL",
+    "codex:app": "node codex-profile-card/bin/codex-profile-card.mjs --source app --output profile/codex-local.svg --name \"Ambar Li\" --handle \"@ambarli\" --initials AL",
     "codex:analytics": "node codex-profile-card/bin/codex-profile-card.mjs --source analytics --output profile/codex-analytics.svg --name \"Ambar Li\" --handle \"@ambarli\" --initials AL",
     "check": "npm --workspace codex-profile-card run check",
     "test": "npm --workspace codex-profile-card test"

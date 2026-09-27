@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -9,10 +10,13 @@ import { parseArgs } from "node:util";
 /**
  * @typedef {import("./codex-profile-card.d.ts").AnalyticsBucket} AnalyticsBucket
  * @typedef {import("./codex-profile-card.d.ts").BuildAnalyticsCardDataOptions} BuildAnalyticsCardDataOptions
+ * @typedef {import("./codex-profile-card.d.ts").BuildCodexAppCardDataOptions} BuildCodexAppCardDataOptions
  * @typedef {import("./codex-profile-card.d.ts").BuildLocalCardDataOptions} BuildLocalCardDataOptions
+ * @typedef {import("./codex-profile-card.d.ts").CodexAppUsage} CodexAppUsage
  * @typedef {import("./codex-profile-card.d.ts").CodexCardData} CodexCardData
  * @typedef {import("./codex-profile-card.d.ts").CodexUsageDay} CodexUsageDay
  * @typedef {import("./codex-profile-card.d.ts").FetchAnalyticsUsageOptions} FetchAnalyticsUsageOptions
+ * @typedef {import("./codex-profile-card.d.ts").FetchCodexAppUsageOptions} FetchCodexAppUsageOptions
  * @typedef {import("./codex-profile-card.d.ts").MergeAnalyticsHistoryOptions} MergeAnalyticsHistoryOptions
  * @typedef {import("./codex-profile-card.d.ts").RenderCodexStatsCardOptions} RenderCodexStatsCardOptions
  * @typedef {import("./codex-profile-card.d.ts").SummarizeUsageDaysOptions} SummarizeUsageDaysOptions
@@ -250,6 +254,124 @@ export async function buildLocalCardData({
     sourceLabel: "Local Codex logs",
     days: normalizedDays,
     ...summarizeUsageDays(rawDays),
+  };
+}
+
+/**
+ * Fetch the same account usage summary and daily buckets shown by the Codex app.
+ * @param {FetchCodexAppUsageOptions} [options]
+ * @returns {Promise<CodexAppUsage>}
+ */
+export function fetchCodexAppUsage({
+  command = "codex",
+  args = ["app-server"],
+  timeoutMs = 30_000,
+} = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const lines = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      finish(new Error("Timed out reading Codex app account usage"));
+    }, timeoutMs);
+
+    function finish(error, result) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      lines.close();
+      child.kill();
+      if (error) reject(error);
+      else resolve(result);
+    }
+
+    function send(message) {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    }
+
+    child.stderr.on("data", (chunk) => {
+      stderr = (stderr + chunk.toString()).slice(-2_000);
+    });
+    child.stdin.on("error", (error) => finish(error));
+    child.on("error", (error) => finish(error));
+    child.on("close", (code) => {
+      finish(new Error(`Codex app-server exited (${code}): ${stderr.trim()}`));
+    });
+    lines.on("line", (line) => {
+      let message;
+      try {
+        message = JSON.parse(line);
+      } catch {
+        return;
+      }
+      if (message.id === 0) {
+        if (message.error) {
+          finish(new Error(`Codex app-server initialization failed: ${message.error.message}`));
+          return;
+        }
+        send({ method: "initialized", params: {} });
+        send({ method: "account/usage/read", id: 1 });
+      } else if (message.id === 1) {
+        if (message.error) {
+          finish(new Error(`Codex account usage request failed: ${message.error.message}`));
+        } else {
+          finish(null, message.result);
+        }
+      }
+    });
+
+    send({
+      method: "initialize",
+      id: 0,
+      params: {
+        clientInfo: {
+          name: "codex_profile_card",
+          title: "Codex Profile Card",
+          version: "0.1.1",
+        },
+      },
+    });
+  });
+}
+
+/**
+ * @param {BuildCodexAppCardDataOptions} options
+ * @returns {CodexCardData}
+ */
+export function buildCodexAppCardData({ usage, now = new Date().toISOString(), days = HEATMAP_DAYS } = {}) {
+  const summary = usage?.summary;
+  const buckets = usage?.dailyUsageBuckets;
+  const metrics = [
+    "lifetimeTokens",
+    "peakDailyTokens",
+    "currentStreakDays",
+    "longestStreakDays",
+  ];
+  if (!summary || metrics.some((key) => !Number.isFinite(summary[key]) || summary[key] < 0)) {
+    throw new Error("Codex app did not return complete profile metrics");
+  }
+  if (!Array.isArray(buckets)) {
+    throw new Error("Codex app did not return daily usage buckets");
+  }
+  const rawDays = buckets.map((bucket) => {
+    const date = normalizeDateKey(bucket.startDate);
+    if (!date || !Number.isFinite(bucket.tokens) || bucket.tokens < 0) {
+      throw new Error("Codex app returned an invalid daily usage bucket");
+    }
+    return { date, totalTokens: bucket.tokens };
+  });
+  return {
+    sourceLabel: "Codex app account",
+    days: normalizeUsageDays(
+      rawDays,
+      days,
+      [latestDate(rawDays), isoDate(new Date(now))].filter(Boolean).sort().at(-1),
+    ),
+    lifetimeTokens: summary.lifetimeTokens,
+    peakDayTokens: summary.peakDailyTokens,
+    currentStreak: summary.currentStreakDays,
+    longestStreak: summary.longestStreakDays,
   };
 }
 
@@ -818,6 +940,12 @@ export async function runCli(argv = process.argv.slice(2)) {
       now,
       days,
     });
+  } else if (source === "app") {
+    data = buildCodexAppCardData({
+      usage: await fetchCodexAppUsage(),
+      now,
+      days,
+    });
   } else if (source === "analytics") {
     if (args.fixture) {
       const buckets = extractBuckets(
@@ -921,10 +1049,11 @@ function usageText() {
   return `
 Usage:
   codex-profile-card --source local --output codex-local.svg [options]
+  codex-profile-card --source app --output codex-app.svg [options]
   codex-profile-card --source analytics --output codex-analytics.svg [options]
 
 Options:
-  --source local|analytics        Data source. Defaults to local.
+  --source local|app|analytics    Data source. Defaults to local.
   --output <path>                 SVG output path. Defaults to codex-<source>.svg.
   --name <name>                   Display name. Defaults to Codex auth name, then "Codex User".
   --handle <handle>               Display handle. Defaults to empty.

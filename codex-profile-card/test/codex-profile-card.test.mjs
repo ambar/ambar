@@ -8,7 +8,9 @@ import { createMockCodexProfileData } from "../scripts/mock-card-data.mjs";
 import * as publicApi from "../src/codex-profile-card.mjs";
 import {
   buildAnalyticsCardData,
+  buildCodexAppCardData,
   buildLocalCardData,
+  fetchCodexAppUsage,
   mergeAnalyticsHistory,
   renderCodexStatsCard,
   runCli,
@@ -428,6 +430,50 @@ test("runCli infers default identity from Codex auth", async () => {
   assert.match(svg, />Codex Native</);
   assert.doesNotMatch(svg, />@codexnative</);
   assert.match(svg, />CN</);
+});
+
+test("fetchCodexAppUsage reads the app-server account usage response", async () => {
+  const root = await makeTempDir();
+  const mockServer = path.join(root, "mock-app-server.mjs");
+  await writeFile(mockServer, `
+    import readline from "node:readline";
+    let initialized = false;
+    for await (const line of readline.createInterface({ input: process.stdin })) {
+      const message = JSON.parse(line);
+      if (message.method === "initialize") {
+        process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + "\\n");
+      } else if (message.method === "initialized") {
+        initialized = true;
+      } else if (message.method === "account/usage/read") {
+        if (!initialized) process.exit(1);
+        process.stdout.write(JSON.stringify({ id: message.id, result: {
+          summary: { lifetimeTokens: 500, peakDailyTokens: 300, currentStreakDays: 2, longestStreakDays: 14 },
+          dailyUsageBuckets: [{ startDate: "2026-06-19", tokens: 300 }],
+        } }) + "\\n");
+      }
+    }
+  `);
+  const usage = await fetchCodexAppUsage({ command: process.execPath, args: [mockServer] });
+  const data = buildCodexAppCardData({ usage, now: "2026-06-19T00:00:00.000Z" });
+
+  assert.equal(data.lifetimeTokens, 500);
+  assert.equal(data.peakDayTokens, 300);
+  assert.equal(data.currentStreak, 2);
+  assert.equal(data.longestStreak, 14);
+  assert.deepEqual(data.days.at(-1), { date: "2026-06-19", totalTokens: 300, turns: 0 });
+  assert.equal(data.days.length, HEATMAP_DAYS);
+});
+
+test("buildCodexAppCardData rejects incomplete account statistics", () => {
+  assert.throws(
+    () => buildCodexAppCardData({
+      usage: {
+        summary: { lifetimeTokens: 500, peakDailyTokens: null, currentStreakDays: 2, longestStreakDays: 14 },
+        dailyUsageBuckets: [],
+      },
+    }),
+    /complete profile metrics/,
+  );
 });
 
 test("runCli can render the test avatar URL without showing name or handle", async () => {
